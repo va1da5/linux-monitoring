@@ -1,0 +1,50 @@
+---
+- name: Deploy ELK
+  hosts: elk
+  become: true
+
+  tasks:
+    - name: Install dependencies
+      ansible.builtin.package:
+        name: python3-pip
+        update_cache: true
+
+    - ansible.builtin.include_role:
+        name: geerlingguy.docker
+      tags: ["install-docker"]
+
+    - name: Install Python dependencies
+      tags: ["install-docker"]
+      ansible.builtin.pip:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - docker
+        - docker-compose
+
+    - name: Manage service
+      tags: ["containers"]
+      block:
+        - name: Copy files
+
+          ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "/opt/elk/"
+          with_fileglob:
+            - "files/elk/*"
+          notify:
+            - Restart ELK
+
+        - name: Create and start ELK services
+          community.docker.docker_compose:
+            project_src: "/opt/elk"
+          register: output
+
+        - ansible.builtin.debug:
+            var: output
+
+  handlers:
+    - name: Restart ELK
+      community.docker.docker_compose:
+        project_src: "/opt/elk"
+        restarted: true

@@ -1,0 +1,5 @@
+---
+# ansible-galaxy install -r requirements.yml
+- src: geerlingguy.docker
+
+- src: juju4.falco

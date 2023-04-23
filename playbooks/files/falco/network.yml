@@ -1,0 +1,21 @@
+# Note that this can be either individual IPs or netmasks
+- list: allowed_outbound_destination_ipaddrs
+  items: ['"127.0.0.1"', '"8.8.8.8"']
+
+- list: allowed_outbound_destination_networks
+  items: ['"127.0.0.1/8"']
+
+- list: allowed_outbound_destination_domains
+  items: [google.com, www.yahoo.com]
+
+- rule: Unexpected outbound connection destination
+  desc: Detect any outbound connection to a destination outside of an allowed set of ips, networks, or domain names
+  condition: >
+    outbound and not
+    ((fd.sip in (allowed_outbound_destination_ipaddrs)) or
+     (fd.snet in (allowed_outbound_destination_networks)) or
+     (fd.sip.name in (allowed_outbound_destination_domains)))
+  enabled: true
+  output: Disallowed outbound connection destination (command=%proc.cmdline pid=%proc.pid connection=%fd.name user=%user.name user_loginuid=%user.loginuid container_id=%container.id image=%container.image.repository)
+  priority: NOTICE
+  tags: [host, container, network, mitre_command_and_control, TA0011]

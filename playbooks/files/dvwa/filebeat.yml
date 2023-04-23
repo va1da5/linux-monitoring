@@ -1,0 +1,38 @@
+filebeat.inputs:
+  - type: filestream
+    paths:
+      - /var/logs/nginx/access.log
+    fields:
+      app: dvwa
+
+    processors:
+      - dissect:
+          tokenizer: '%{remote_addr} - %{remote_user} [%{time_local}] "%{request}" %{status} %{body_bytes_sent} "%{http_referer}" "%{http_user_agent}" "%{request_body}"'
+          field: "message"
+          target_prefix: ""
+          ignore_failure: true
+      - timestamp:
+          field: time_local
+          target_field: "@timestamp"
+          layouts:
+            - "02/Jan/2006:15:04:05 -0700"
+          ignore_failure: true
+
+  - type: filestream
+    paths:
+      - /var/logs/nginx/alerts.log
+    fields:
+      type: alerts
+
+  - type: filestream
+    paths:
+      - /var/logs/nginx/modsecurity.log
+    fields:
+      type: alerts
+    parsers:
+      - ndjson:
+          target: ""
+          message_key: msg
+
+output.logstash:
+  hosts: ["192.168.122.10:5044"]

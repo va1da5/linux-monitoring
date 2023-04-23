@@ -1,0 +1,57 @@
+---
+- name: Deploy Damn Vulnerable Web Application
+  hosts: ubuntu
+  become: true
+
+  tasks:
+    - name: Install dependencies
+      ansible.builtin.package:
+        name: python3-pip
+        update_cache: true
+
+    - ansible.builtin.include_role:
+        name: geerlingguy.docker
+      tags: ["install-docker"]
+
+    - name: Install Python dependencies
+      tags: ["install-docker"]
+      ansible.builtin.pip:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - docker
+        - docker-compose
+
+    - name: Deploy containers
+      tags: ["containers"]
+      block:
+        - name: Create logs directory
+          ansible.builtin.file:
+            path: /var/logs/nginx
+            state: directory
+            owner: 65532
+            group: 65532
+            mode: "0755"
+
+        - name: Move files
+          ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "/opt/dvwa/"
+          with_fileglob:
+            - files/dvwa/*
+          notify:
+            - Restart DVWA
+
+        - name: Create and start DVWA services
+          community.docker.docker_compose:
+            project_src: "/opt/dvwa"
+          register: output
+
+        - ansible.builtin.debug:
+            var: output
+
+  handlers:
+    - name: Restart DVWA
+      community.docker.docker_compose:
+        project_src: "/opt/dvwa"
+        restarted: true

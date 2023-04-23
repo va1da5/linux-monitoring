@@ -1,0 +1,41 @@
+---
+- name: Install monitoring
+  hosts: ubuntu
+  become: true
+
+  tasks:
+    - name: Update cache
+      ansible.builtin.package:
+        update_cache: true
+
+    - name: Install Falco
+      vars:
+        falco_file_output: true
+        falco_file_output_path: "/var/log/falco/events.log"
+        falco_http_output_enable: true
+        falco_http_output_url: "http://192.168.122.10:8080"
+      ansible.builtin.include_role:
+        name: juju4.falco
+
+    - meta: flush_handlers
+
+    - name: Enable flaco module
+      ansible.builtin.shell: falco-driver-loader module
+      notify:
+        - Restart falco
+      ignore_errors: true
+
+    - name: Copy Falco rules
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: /etc/falco/rules.d/
+      with_fileglob:
+        - files/falco/*
+      notify:
+        - Restart falco
+
+  handlers:
+    - name: Restart falco
+      ansible.builtin.service:
+        name: falco
+        state: restarted
