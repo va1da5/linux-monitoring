@@ -57,3 +57,5 @@ ansible-playbook playbooks/setup-monitoring.yml
 - [Running Falco](https://falco.org/docs/getting-started/running/)
 - [DAMN VULNERABLE WEB APPLICATION](https://github.com/digininja/DVWA)
 - [owasp/modsecurity-crs](https://hub.docker.com/r/owasp/modsecurity-crs/)
+- [ipt-netflow](https://github.com/aabc/ipt-netflow)
+- [fluentbit](https://fluentbit.io/)
