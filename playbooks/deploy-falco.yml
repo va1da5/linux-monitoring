@@ -1,0 +1,68 @@
+---
+- name: Deploy Falco
+  hosts: dvwa
+  become: true
+  tasks:
+    - name: Update cache
+      tags: ["install-docker"]
+      ansible.builtin.package:
+        update_cache: true
+
+    - ansible.builtin.include_role:
+        name: geerlingguy.docker
+      tags: ["install-docker"]
+
+    - name: Deploy containers
+      tags: ["container"]
+      block:
+        - name: Create Falco directory
+          ansible.builtin.file:
+            path: /etc/falco/rules.d
+            state: directory
+            owner: 65532
+            group: 65532
+            mode: "0755"
+
+        - name: Create logs directory
+          ansible.builtin.file:
+            path: /var/log/falco
+            state: directory
+            owner: 65532
+            group: 65532
+            mode: "0755"
+
+        - name: Deploy Falco config file
+          ansible.builtin.copy:
+            src: files/falco/falco.yaml
+            dest: /etc/falco
+
+        # monitor for any unexpected outbound network traffic
+        - name: Deploy Falco network rules
+          ansible.builtin.copy:
+            src: files/falco/network.yml
+            dest: /etc/falco/rules.d
+
+        # https://github.com/falcosecurity/rules/tree/main
+        - name: Deploy OOTB Falco rules
+          ansible.builtin.get_url:
+            url: https://raw.githubusercontent.com/falcosecurity/rules/main/rules/falco_rules.yaml
+            dest: /etc/falco/rules.d
+
+        # https://falco.org/docs/install-operate/running/#privileged
+        - name: Start Falco container
+          ansible.builtin.shell:
+            cmd: |
+              docker rm -f falco && sleep 2
+              docker run -d \
+                --name falco \
+                --privileged \
+                --restart unless-stopped \
+                -v /var/run/docker.sock:/host/var/run/docker.sock \
+                -v /proc:/host/proc:ro \
+                -v /etc:/host/etc:ro \
+                -v /var/log/falco:/var/log/falco \
+                -v /etc/falco/rules.d:/etc/falco/rules.d:ro \
+                -v /etc/falco/falco.yaml:/etc/falco/falco.yaml:ro \
+                falcosecurity/falco-no-driver:latest falco -o engine.kind=modern_ebpf
+            chdir: /etc/falco/
+          ignore_errors: true

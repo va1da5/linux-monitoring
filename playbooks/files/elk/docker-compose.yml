@@ -1,8 +1,6 @@
-version: "3"
-
 services:
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.7.0-amd64
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2-amd64
     environment:
       - discovery.type=single-node
       - cluster.name=docker-cluster
@@ -30,7 +28,7 @@ services:
       - es-data:/usr/share/elasticsearch/data
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:8.7.0-amd64
+    image: docker.elastic.co/kibana/kibana:8.12.2-amd64
     environment:
       - SERVERNAME=kibana
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
@@ -38,12 +36,13 @@ services:
       - ELASTICSEARCH_PASSWORD=Admin1Admin1
     ports:
       - 5601:5601
+      - 80:5601
 
   logstash:
-    image: docker.elastic.co/logstash/logstash:8.7.0-amd64
+    image: docker.elastic.co/logstash/logstash:8.12.2-amd64
     container_name: logstash
     environment:
-        - node.name=logstash
+      - node.name=logstash
     volumes:
       - "./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
     ports:

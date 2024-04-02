@@ -1,5 +1,9 @@
 ---
 # ansible-galaxy install -r requirements.yml
-- src: geerlingguy.docker
-
-- src: juju4.falco
+roles:
+  - src: geerlingguy.docker
+  # - src: juju4.falco
+# collections:
+# https://docs.ansible.com/ansible/latest/collections/containers/podman/index.html
+# - name: containers.podman
+#   version: 1.12.0

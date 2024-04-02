@@ -1,7 +1,7 @@
 filebeat.inputs:
   - type: filestream
     paths:
-      - /var/logs/nginx/access.log
+      - /var/log/nginx/access.log
     fields:
       app: dvwa
 
@@ -20,13 +20,13 @@ filebeat.inputs:
 
   - type: filestream
     paths:
-      - /var/logs/nginx/alerts.log
+      - /var/log/nginx/alerts.log
     fields:
       type: alerts
 
   - type: filestream
     paths:
-      - /var/logs/nginx/modsecurity.log
+      - /var/log/nginx/modsecurity.log
     fields:
       type: alerts
     parsers:

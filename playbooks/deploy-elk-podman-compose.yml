@@ -1,0 +1,38 @@
+---
+- name: Deploy ELK
+  hosts: elk
+  become: true
+
+  tasks:
+    - name: Install dependencies
+      ansible.builtin.package:
+        name:
+          - podman
+          - podman-docker
+        update_cache: true
+
+    - name: Enable podman.socket
+      systemd:
+        name: podman.socket
+        enabled: yes
+        state: started
+
+    - name: Copy files
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "/opt/elk/"
+      with_fileglob:
+        - "files/elk/*"
+      notify:
+        - elk-restart
+
+    - name: Create and start ELK services
+      community.docker.docker_compose:
+        project_src: "/opt/elk"
+      register: output
+
+  handlers:
+    - name: elk-restart
+      community.docker.docker_compose:
+        project_src: "/opt/elk"
+        restarted: true

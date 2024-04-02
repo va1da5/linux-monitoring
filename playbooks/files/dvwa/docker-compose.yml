@@ -1,6 +1,6 @@
-version: "3.9"
 services:
   www:
+    container_name: www
     build:
       context: .
     restart: always
@@ -8,48 +8,63 @@ services:
       - ./config.inc.php:/var/www/html/config/config.inc.php:ro
     depends_on:
       - mariadb
+    ports:
+      - 8002:80
 
   mariadb:
-    image: mariadb:10.7
+    container_name: mariadb
+    image: mariadb:11.3.2
     env_file: dvwa.env
     volumes:
-       - mariadb-data:/var/lib/mysql/data
+      - mariadb-data:/var/lib/mysql/data
     restart: always
 
   nginx:
+    container_name: nginx
     image: cgr.dev/chainguard/nginx
     restart: always
-    container_name: nginx
     ports:
-      - 80:80
-      - 443:443
+      - 80:8000
+      - 443:8443
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
-      - /var/logs/nginx:/var/logs/nginx
+      - /var/log/nginx:/var/log/nginx
     depends_on:
       - www
 
   modsecurity:
+    container_name: modsecurity
     image: owasp/modsecurity-crs:nginx-alpine
+    user: root
     restart: always
     volumes:
-      - "/var/logs/nginx:/var/logs/nginx:rw"
+      - /var/log/nginx:/var/log/nginx
+      - ./nginx_html:/usr/share/nginx/html
+      - ./default.conf.template:/etc/nginx/templates/conf.d/default.conf.template:ro
     environment:
       - BACKEND=http://www:80
       - PORT=8000
       - SET_REAL_IP_FROM=X-Forwarded-For
       - REAL_IP_HEADER=X-Forwarded-For
+      - SET_REAL_IP_FROM=nginx
       - ACCESSLOG=/dev/null
-      - ERRORLOG=/var/logs/nginx/alerts.log
-      - BLOCKING_PARANOIA=3
-      - MODSEC_AUDIT_STORAGE=/var/logs/nginx/
-      - MODSEC_AUDIT_LOG=/var/logs/nginx/modsecurity.log
+      - ERRORLOG=/var/log/nginx/alerts.log
+      - MODSEC_AUDIT_STORAGE=/var/log/nginx/
+      - MODSEC_AUDIT_LOG=/var/log/nginx/modsecurity.log
+      - BLOCKING_PARANOIA=2
+      - EXECUTING_PARANOIA=2
+      - ANOMALY_INBOUND=10
+      - ANOMALY_OUTBOUND=5
+      - MODSEC_RULE_ENGINE=on
+      - MODSEC_REQ_BODY_ACCESS=on
+    ports:
+      - 8001:8000
 
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.7.0
     restart: always
     volumes:
-      - "/var/logs/nginx:/var/logs/nginx:ro"
+      - "/var/log/nginx:/var/log/nginx:ro"
       # Bind-mount a custom configuration file
       - "./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro"
     # command: filebeat -e -strict.perms=false

@@ -1,33 +1,25 @@
 ---
 - name: Deploy Damn Vulnerable Web Application
-  hosts: ubuntu
+  hosts: dvwa
   become: true
-
+  vars:
+    service_location: /opt/dvwa
   tasks:
-    - name: Install dependencies
+    - name: Update cache
+      tags: ["install-docker"]
       ansible.builtin.package:
-        name: python3-pip
         update_cache: true
 
     - ansible.builtin.include_role:
         name: geerlingguy.docker
       tags: ["install-docker"]
 
-    - name: Install Python dependencies
-      tags: ["install-docker"]
-      ansible.builtin.pip:
-        name: "{{ item }}"
-        state: present
-      with_items:
-        - docker
-        - docker-compose
-
     - name: Deploy containers
       tags: ["containers"]
       block:
         - name: Create logs directory
           ansible.builtin.file:
-            path: /var/logs/nginx
+            path: /var/log/nginx
             state: directory
             owner: 65532
             group: 65532
@@ -36,22 +28,32 @@
         - name: Move files
           ansible.builtin.copy:
             src: "{{ item }}"
-            dest: "/opt/dvwa/"
+            dest: "{{ service_location }}/"
           with_fileglob:
             - files/dvwa/*
           notify:
-            - Restart DVWA
+            - dvwa-restart
+
+        - name: Move Nginx error files
+          ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "{{ service_location }}/nginx_html/"
+          with_fileglob:
+            - files/dvwa/nginx_html/*
+          notify:
+            - dvwa-restart
 
         - name: Create and start DVWA services
-          community.docker.docker_compose:
-            project_src: "/opt/dvwa"
+          ansible.builtin.shell:
+            cmd: docker compose up -d
+            chdir: "{{ service_location }}"
           register: output
 
         - ansible.builtin.debug:
             var: output
 
   handlers:
-    - name: Restart DVWA
-      community.docker.docker_compose:
-        project_src: "/opt/dvwa"
-        restarted: true
+    - name: dvwa-restart
+      ansible.builtin.shell:
+        cmd: docker compose restart
+        chdir: "{{ service_location }}"

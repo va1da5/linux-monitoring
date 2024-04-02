@@ -1,6 +1,7 @@
 ---
+# !! Does not work
 - name: Install monitoring
-  hosts: ubuntu
+  hosts: dvwa
   become: true
 
   tasks:
@@ -20,9 +21,11 @@
     - meta: flush_handlers
 
     - name: Enable flaco module
-      ansible.builtin.shell: falco-driver-loader module
+      ansible.builtin.shell: |
+        falcoctl driver config --type ebpf
+        falcoctl driver install
       notify:
-        - Restart falco
+        - falco-restart
       ignore_errors: true
 
     - name: Copy Falco rules
@@ -32,10 +35,10 @@
       with_fileglob:
         - files/falco/*
       notify:
-        - Restart falco
+        - falco-restart
 
   handlers:
-    - name: Restart falco
+    - name: falco-restart
       ansible.builtin.service:
         name: falco
         state: restarted
