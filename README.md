@@ -66,3 +66,8 @@ ansible-playbook playbooks/deploy-falco.yml
 - [Dockerhub Falco](https://hub.docker.com/r/falcosecurity/falco)
 - [Error error opening device /host/dev/falco0](https://github.com/falcosecurity/falco/issues/2469)
 - [Falco Docker](https://falco.org/docs/install-operate/running/#docker)
+- [Logging all inbound and outbound traffic with firewalld direct rules](https://www.suse.com/support/kb/doc/?id=000020833)
+- [Why is firewalld allowing public traffic to my non-public ports, bound to Docker containers?](https://serverfault.com/questions/1077849/why-is-firewalld-allowing-public-traffic-to-my-non-public-ports-bound-to-docker)
+- [Packet filtering and firewalls](https://docs.docker.com/network/packet-filtering-firewalls/)
+- [How to Secure a Docker Host Using Firewalld](https://dev.to/soerenmetje/how-to-secure-a-docker-host-using-firewalld-2joo)
+- [Securing Docker ports to local access only with firewalld](https://talk.plesk.com/threads/securing-docker-ports-to-local-access-only-with-firewalld.368775/)

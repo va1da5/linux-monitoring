@@ -1,0 +1,57 @@
+---
+# !!Work in progress
+- name: Configure Firewall
+  hosts: dvwa
+  become: true
+  tasks:
+    - name: Install firewalld
+      ansible.builtin.package:
+        name: firewalld
+        update_cache: true
+
+    - name: Enable FW
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+
+    # - name: Rule to log all incoming traffic setting log level to 4
+    #   ansible.posix.firewalld:
+    #     rich_rule: rule family="ipv4" source address="0.0.0.0/0" log prefix="INPUT " level="info" accept
+    #     zone: public
+    #     permanent: true
+    #     immediate: true
+    #     state: enabled
+    #   notify:
+    #     - firewalld-restart
+
+    # - name: Rule to log all incoming traffic setting log level to 4
+    #   ansible.posix.firewalld:
+    #     rich_rule: 'rule family="ipv4" source address="{{ ansible_host }}" log prefix="OUTPUT " level="info" accept'
+    #     zone: public
+    #     permanent: true
+    #     immediate: true
+    #     state: enabled
+    #   notify:
+    #     - firewalld-restart
+
+    - name: Add firewall direct rule for logging
+      ansible.builtin.command: firewall-cmd --direct --add-rule ipv4 filter INPUT 0 -p all -s 0.0.0.0/0 -j LOG --log-prefix "INPUT " --log-level 4
+      register: firewall_cmd_result
+      changed_when: "'success' in firewall_cmd_result.stdout"
+      notify: firewalld-restart
+
+    - name: Do not permit traffic in default zone on port 8000/tcp
+      ansible.posix.firewalld:
+        port: 8001/tcp
+        permanent: true
+        immediate: true
+        state: present
+        target: DROP
+      notify:
+        - firewalld-restart
+
+  handlers:
+    - name: firewalld-restart
+      ansible.builtin.service:
+        name: firewalld
+        state: restarted
