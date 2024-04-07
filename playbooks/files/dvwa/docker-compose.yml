@@ -72,5 +72,13 @@ services:
     depends_on:
       - nginx
 
+  fluentbit:
+    container_name: fluentbit
+    image: cr.fluentbit.io/fluent/fluent-bit:3.0.0
+    user: root
+    volumes:
+      - /var/log/:/var/log/
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+
 volumes:
   mariadb-data:

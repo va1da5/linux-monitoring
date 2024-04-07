@@ -1,12 +1,13 @@
 ---
-# !!Work in progress
 - name: Configure Firewall
   hosts: dvwa
   become: true
   tasks:
     - name: Install firewalld
       ansible.builtin.package:
-        name: firewalld
+        name:
+          - firewalld
+          - logrotate
         update_cache: true
 
     - name: Enable FW
@@ -14,44 +15,109 @@
         name: firewalld
         state: started
 
-    # - name: Rule to log all incoming traffic setting log level to 4
-    #   ansible.posix.firewalld:
-    #     rich_rule: rule family="ipv4" source address="0.0.0.0/0" log prefix="INPUT " level="info" accept
-    #     zone: public
-    #     permanent: true
-    #     immediate: true
-    #     state: enabled
-    #   notify:
-    #     - firewalld-restart
+    - name: Firewall rules
+      block:
+        - name: Check if command does exist
+          ansible.builtin.raw: which docker
+          changed_when: false
+          register: which_docker
+          ignore_errors: true
 
-    # - name: Rule to log all incoming traffic setting log level to 4
-    #   ansible.posix.firewalld:
-    #     rich_rule: 'rule family="ipv4" source address="{{ ansible_host }}" log prefix="OUTPUT " level="info" accept'
-    #     zone: public
-    #     permanent: true
-    #     immediate: true
-    #     state: enabled
-    #   notify:
-    #     - firewalld-restart
+        - name: Stop Docker service
+          ansible.builtin.service:
+            name: "{{ item }}"
+            state: stopped
+          with_items:
+            - docker.socket
+            - docker.service
+          when: which_docker.rc == 0
 
-    - name: Add firewall direct rule for logging
-      ansible.builtin.command: firewall-cmd --direct --add-rule ipv4 filter INPUT 0 -p all -s 0.0.0.0/0 -j LOG --log-prefix "INPUT " --log-level 4
-      register: firewall_cmd_result
-      changed_when: "'success' in firewall_cmd_result.stdout"
-      notify: firewalld-restart
+        - name: Delete all current firewalld zones
+          ansible.builtin.file:
+            state: absent
+            path: "{{ item }}"
+          with_items:
+            - /etc/firewalld/zones/
+            - /etc/firewalld/direct.xml
 
-    - name: Do not permit traffic in default zone on port 8000/tcp
-      ansible.posix.firewalld:
-        port: 8001/tcp
-        permanent: true
-        immediate: true
-        state: present
-        target: DROP
-      notify:
-        - firewalld-restart
+        - name: Copy default zones
+          ansible.builtin.copy:
+            src: /usr/lib/firewalld/zones
+            dest: /etc/firewalld/zones
+            remote_src: yes
 
-  handlers:
-    - name: firewalld-restart
-      ansible.builtin.service:
-        name: firewalld
-        state: restarted
+        - name: Configure logging of new connections
+          ansible.builtin.command: "{{ item }}"
+          register: firewall_cmd_result
+          changed_when: "'success' in firewall_cmd_result.stdout"
+          with_items:
+            - firewall-cmd --reload
+            - firewall-cmd --direct --add-rule ipv4 filter INPUT 0 -p all -s 0.0.0.0/0 -m state --state NEW -j LOG --log-prefix "FW_INPUT " --log-level 4
+            - firewall-cmd --direct --add-rule ipv4 filter INPUT 0 -p all -s ::/0 -m state --state NEW -j LOG --log-prefix "FW_INPUT " --log-level 4
+            - firewall-cmd --direct --add-rule ipv4 filter OUTPUT 0 -p all -s 0.0.0.0/0 -m state --state NEW -j LOG --log-prefix "FW_OUTPUT " --log-level 4
+            - firewall-cmd --direct --add-rule ipv6 filter OUTPUT 0 -p all -s ::/0 -m state --state NEW -j LOG --log-prefix "FW_OUTPUT " --log-level 4
+            - firewall-cmd --runtime-to-permanent
+            - firewall-cmd --reload
+
+        # - name: Recreate DOCKER-USER iptables chain with firewalld. Ignore warnings, do not ignore errors
+        #   ansible.builtin.command: "{{ item }}"
+        #   register: firewall_cmd_result
+        #   changed_when: "'success' in firewall_cmd_result.stdout"
+        #   with_items:
+        #     - firewall-cmd --permanent --direct --remove-chain ipv4 filter DOCKER-USER
+        #     - firewall-cmd --permanent --direct --remove-rules ipv4 filter DOCKER-USER
+        #     - firewall-cmd --permanent --direct --add-chain ipv4 filter DOCKER-USER
+
+        # - name: Add iptables rules to DOCKER-USER chain - unrestricted outbound, restricted inbound to private IPs
+        #   ansible.builtin.command: "{{ item }}"
+        #   register: firewall_cmd_result
+        #   changed_when: "'success' in firewall_cmd_result.stdout"
+        #   with_items:
+        #     - firewall-cmd --permanent --direct --add-rule ipv4 filter DOCKER-USER 1 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT -m comment --comment 'Allow containers to connect to the outside world'
+        #     - firewall-cmd --permanent --direct --add-rule ipv4 filter DOCKER-USER 1 -j RETURN -s 127.0.0.0/8 -m comment --comment 'Allow internal docker communication, loopback addresses'
+        #     - firewall-cmd --permanent --direct --add-rule ipv4 filter DOCKER-USER 1 -j RETURN -s 10.0.0.0/8 -m comment --comment 'Allow internal docker communication, private range'
+        #     - firewall-cmd --permanent --direct --add-rule ipv4 filter DOCKER-USER 1 -j RETURN -s 172.16.0.0/12 -m comment --comment 'Allow internal docker communication, private range'
+        #     - firewall-cmd --permanent --direct --add-rule ipv4 filter DOCKER-USER 1 -j RETURN -s 192.168.0.0/16 -m comment --comment 'Allow internal docker communication, private range'
+
+        # - name: Block all other IPs.
+        #   ansible.builtin.command: "{{ item }}"
+        #   register: firewall_cmd_result
+        #   changed_when: "'success' in firewall_cmd_result.stdout"
+        #   with_items:
+        #     - firewall-cmd --permanent --direct --add-rule ipv4 filter DOCKER-USER 10 -j REJECT -m comment --comment 'Reject all other traffic to DOCKER-USER'
+        #     - firewall-cmd --reload
+
+        - name: Start Docker service
+          ansible.builtin.service:
+            name: "{{ item }}"
+            state: started
+          with_items:
+            - docker.socket
+            - docker.service
+          when: which_docker.rc == 0
+
+        - name: Copy files
+          ansible.builtin.copy:
+            src: files/dvwa/logrotate.conf
+            dest: /etc/logrotate.d/rsyslog
+
+        - name: Start and enable logrotate
+          ansible.builtin.service:
+            name: logrotate
+            state: started
+            enabled: true
+          ignore_errors: true
+
+        - name: Check if file exists
+          ansible.builtin.stat:
+            path: /etc/cron.daily/logrotate
+          register: daily_logrotate
+
+        - name: Enable logrotate hourly
+          ansible.builtin.file:
+            src: /etc/cron.daily/logrotate
+            dest: /etc/cron.hourly/logrotate
+            owner: root
+            group: root
+            state: link
+          when: daily_logrotate.stat.exists
